@@ -24,6 +24,9 @@ namespace IngameScript {
         public string ShipName = "TestShip"; //ADD THIS NAME TO YOUR SHIP'S GRID NAME
         public string ConnectorName = "Connector"; //ADD THE SHIPNAME IN THE CONNECTOR YOU WILL USE TO UNLOAD/RECHARGE (EX:TestShipConnector)
         public float MinBatteryPower = 0.2f; //REPRESENTS THE MINIMUM PERCENTAGE OF BATTERIES (EX: 0.2 = 20%)
+        public bool ShowCargoInfo = true;
+        public bool ShowBatteryInfo = true;
+
         //----------------------------------
 
         MyShip thisShip;
@@ -68,6 +71,22 @@ namespace IngameScript {
             public void Update() {
                 BatteryBlock.Update();
                 ConnectorBlock.Update();
+            }
+            public void PrintTextOnScreen(string textpanel, string textoutput = " ") {
+                List<IMyTerminalBlock> textpanelgroup = new List<IMyTerminalBlock>();
+                ThisProgram.GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(textpanelgroup);
+                foreach(var x in textpanelgroup) {
+                    var lcd = x as IMyTextPanel;
+                    if(lcd != null) {
+                        if(lcd.CubeGrid.CustomName == Name && lcd.CustomName.StartsWith(textpanel)) {
+                            if(textoutput != " ") {
+                                lcd.ContentType = ContentType.TEXT_AND_IMAGE;
+                                lcd.WriteText(textoutput);
+                            }
+                        }
+                        
+                    }
+                }
             }
             private string RenameBlock(string block, int count) {
                 if(count < 10) {
@@ -244,6 +263,13 @@ namespace IngameScript {
                         }
                         LowPower = (StoredPower / MaxPower) < MinPower;
                     }
+                    myShip.PrintTextOnScreen("testpanel", ToString());
+                }
+
+                public override string ToString() {
+                    StringBuilder sb = new StringBuilder();
+                    sb.AppendLine("BATTERY POWER: " + "     " + (StoredPower * 1000).ToString("F2") + "/" + MaxPower * 1000 + " kWh");
+                    return sb.ToString();
                 }
             }
             public class MyConnector {
