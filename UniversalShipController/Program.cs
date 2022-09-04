@@ -21,10 +21,9 @@ using VRageMath;
 namespace IngameScript {
     partial class Program : MyGridProgram {
         //-----------ScriptConfig-----------
-        public string ShipName = "TestShip"; //ADD THIS NAME TO YOUR SHIP'S GRID NAME
-        public string ConnectorName = "Connector"; //ADD THE SHIPNAME IN THE CONNECTOR YOU WILL USE TO UNLOAD/RECHARGE (EX:TestShipConnector)
+        public string ShipName = "AShipTest"; //ADD THIS NAME TO YOUR SHIP'S GRID NAME
+        public string ConnectorName = "Connector"; //ADD THE SHIPNAME IN THE CONNECTOR YOU WILL USE TO UNLOAD/RECHARGE (EX:AShipTestConnector)
         public float MinBatteryPower = 0.2f; //REPRESENTS THE MINIMUM PERCENTAGE OF BATTERIES (EX: 0.2 = 20%)
-        public bool ShowCargoInfo = true;
         public bool ShowBatteryInfo = true;
 
         //----------------------------------
@@ -53,11 +52,11 @@ namespace IngameScript {
         public class MyShip {
             internal static Program ThisProgram;
             public string Name { get; private set; }
+            public string TextStatus { get; set; }
             private MyBattery BatteryBlock;
             private MyConnector ConnectorBlock;
             private MyCargo CargoBlock;
-
-
+            private MyTextPanel TextPanelBlock;
             public MyShip(string name, Program program) {
                 Name = name;
                 ThisProgram = program;
@@ -67,26 +66,12 @@ namespace IngameScript {
                 BatteryBlock = new MyBattery(this);
                 ConnectorBlock = new MyConnector(this);
                 CargoBlock = new MyCargo(this);
+                TextPanelBlock = new MyTextPanel(this);
             }
             public void Update() {
                 BatteryBlock.Update();
                 ConnectorBlock.Update();
-            }
-            public void PrintTextOnScreen(string textpanel, string textoutput = " ") {
-                List<IMyTerminalBlock> textpanelgroup = new List<IMyTerminalBlock>();
-                ThisProgram.GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(textpanelgroup);
-                foreach(var x in textpanelgroup) {
-                    var lcd = x as IMyTextPanel;
-                    if(lcd != null) {
-                        if(lcd.CubeGrid.CustomName == Name && lcd.CustomName.StartsWith(textpanel)) {
-                            if(textoutput != " ") {
-                                lcd.ContentType = ContentType.TEXT_AND_IMAGE;
-                                lcd.WriteText(textoutput);
-                            }
-                        }
-                        
-                    }
-                }
+                TextPanelBlock.Update();
             }
             private string RenameBlock(string block, int count) {
                 if(count < 10) {
@@ -98,7 +83,69 @@ namespace IngameScript {
                 else
                     return $"{Name}{block}{count}";
             }
-
+            public class MyTextPanel {
+                private MyShip myShip;
+                List<IMyTerminalBlock> TextPanelList = new List<IMyTerminalBlock>();
+                public string StatusPanelName { get; private set; }
+                public MyTextPanel(MyShip ms) {
+                    myShip = ms;
+                    StatusPanelName = "TP_STATUS";
+                    List<IMyTerminalBlock> auxList = new List<IMyTerminalBlock>();
+                    ThisProgram.GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(auxList);
+                    TextPanelList.Clear();
+                    foreach(var x in auxList) {
+                        var textPanel = x as IMyTextPanel;
+                        if(textPanel != null) {
+                            if(textPanel.CubeGrid.CustomName == myShip.Name) {
+                                TextPanelList.Add(textPanel);
+                            }
+                        }
+                    }
+                }
+                public void Update() {
+                    StatusTP();
+                }
+                public void StatusTP() {
+                    string textoutput = "";
+                    foreach(var x in TextPanelList) {
+                        var panel = x as IMyTextPanel;
+                        if(panel != null) {
+                            if(panel.CubeGrid.CustomName == myShip.Name && panel.CustomName == myShip.Name + StatusPanelName) {
+                                panel.ContentType = (ContentType)1;
+                                panel.FontColor = Color.Yellow;
+                                panel.Alignment = (TextAlignment)0;
+                                panel.FontSize = 1.25f;
+                                textoutput = "SHIP STATUS\n";
+                                if(panel.DefinitionDisplayNameText != "Wide LCD Panel") {
+                                    if(ThisProgram.ShowBatteryInfo) {
+                                        textoutput += "\nBattery Power:                     ";
+                                        textoutput += ((myShip.BatteryBlock.StoredPower / myShip.BatteryBlock.MaxPower) * 100).ToString("F2") + "%\n";
+                                        if(myShip.BatteryBlock.IsCharging) {
+                                            textoutput += "Battery Status:          RECHARGING\n";
+                                        }
+                                        else {
+                                            textoutput += "Battery Status:                      AUTO\n";
+                                        }
+                                    }
+                                }
+                                else {
+                                    if(ThisProgram.ShowBatteryInfo) {
+                                        textoutput += "\nBattery Power:                                                                             ";
+                                        textoutput += ((myShip.BatteryBlock.StoredPower / myShip.BatteryBlock.MaxPower) * 100).ToString("F2") + "%\n";
+                                        if(myShip.BatteryBlock.IsCharging) {
+                                            textoutput += "Battery Status                                                                    RECHARGING\n";
+                                        }
+                                        else {
+                                            textoutput += "Battery Status:                                                                               AUTO\n";
+                                        }
+                                    }
+                                }
+                                panel.WriteText(textoutput);
+                            }
+                        }
+                    }
+                }
+            }
             public class MyCargo {
                 List<IMyTerminalBlock> ContainerList = new List<IMyTerminalBlock>();
                 private MyShip myShip;
@@ -221,7 +268,6 @@ namespace IngameScript {
                     MaxPower = 0f;
                     MinPower = ThisProgram.MinBatteryPower;
                     LowPower = false;
-
                     List<IMyTerminalBlock> auxList = new List<IMyTerminalBlock>();
                     ThisProgram.GridTerminalSystem.GetBlocksOfType<IMyBatteryBlock>(auxList);
                     BatteryList.Clear();
@@ -263,13 +309,6 @@ namespace IngameScript {
                         }
                         LowPower = (StoredPower / MaxPower) < MinPower;
                     }
-                    myShip.PrintTextOnScreen("testpanel", ToString());
-                }
-
-                public override string ToString() {
-                    StringBuilder sb = new StringBuilder();
-                    sb.AppendLine("BATTERY POWER: " + "     " + (StoredPower * 1000).ToString("F2") + "/" + MaxPower * 1000 + " kWh");
-                    return sb.ToString();
                 }
             }
             public class MyConnector {
@@ -278,22 +317,10 @@ namespace IngameScript {
                 public bool Connectable { get; private set; }
                 public bool Connected { get; private set; }
                 public string Name { get; private set; }
-
                 public MyConnector(MyShip ms) {
                     myShip = ms;
                     Name = ThisProgram.ConnectorName;
                     Connector = ThisProgram.GridTerminalSystem.GetBlockWithName(myShip.Name + Name) as IMyShipConnector;
-                }
-                public void LockUnlcok() {
-                    if(Connector == null) {
-                        Connector = ThisProgram.GridTerminalSystem.GetBlockGroupWithName(myShip.Name + Name) as IMyShipConnector;
-                    }
-                    if(Connectable) {
-                        Connector.Connect();
-                    }
-                    else if(Connected) {
-                        Connector.Disconnect();
-                    }
                 }
                 public void Update() {
                     if(Connector == null) {
